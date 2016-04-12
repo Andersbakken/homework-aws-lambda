@@ -7,16 +7,16 @@ function Homework()
 }
 
 Homework.prototype = {
-    execute: function(event, context) {
+    execute: function(event, context, callback) {
         if (event.header.namespace in this.handlers) {
-            return this.handlers[event.header.namespace].call(this, event, context);
+            this.handlers[event.header.namespace].call(this, event, context, callback);
+        } else {
+            console.error("Unknown execute request", JSON.stringify(event));
         }
-        console.error("Unknown execute request", JSON.stringify(event));
-        return null;
     },
 
     handlers: {
-        "Alexa.ConnectedHome.Discovery": function(event, context) {
+        "Alexa.ConnectedHome.Discovery": function(event, context, callback) {
             const token = event.payload.accessToken;
 
             const discovery = {
@@ -37,7 +37,7 @@ Homework.prototype = {
                                 },
                                 applianceId: "uniqueThermostatDeviceId",
                                 friendlyDescription: "descriptionThatIsShownToCustomer",
-                                friendlyName: " Bedroom Thermostat",
+                                friendlyName: "Bedroom Thermostat",
                                 isReachable: true,
                                 manufacturerName: "yourManufacturerName",
                                 modelName: "fancyThermostat",
@@ -76,11 +76,15 @@ Homework.prototype = {
 
             if (event.header.name in discovery) {
                 discovery[event.header.name](response);
+            } else {
+                console.error(event.header.name, "is not a valid discovery");
             }
 
-            return response;
+            console.log("about to return", JSON.stringify(response));
+
+            callback(null, response);
         },
-        "Alexa.ConnectedHome.Control": function(event, context) {
+        "Alexa.ConnectedHome.Control": function(event, context, callback) {
             const token = event.payload.accessToken;
 
             const deviceId = event.payload.appliance.applianceId;
@@ -105,14 +109,16 @@ Homework.prototype = {
 
             if (event.header.name in control) {
                 control[event.header.name](response);
+            } else {
+                console.error(event.header.name, "is not a valid control");
             }
 
-            return response;
+            callback(null, response);
         }
     }
 };
 
-exports.handler = function(event, context) {
+exports.handler = function(event, context, callback) {
     var homework = new Homework();
-    return homework.execute(event, context);
+    homework.execute(event, context, callback);
 };
