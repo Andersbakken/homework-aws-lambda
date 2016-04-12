@@ -9,10 +9,10 @@ function Homework()
 Homework.prototype = {
     execute: function(event, context) {
         if (event.header.namespace in this.handlers) {
-            this.handlers[event.header.namespace].call(event, context);
-        } else {
-            console.error("Unknown execute request", JSON.stringify(event));
+            return this.handlers[event.header.namespace].call(event, context);
         }
+        console.error("Unknown execute request", JSON.stringify(event));
+        return null;
     },
 
     handlers: {
