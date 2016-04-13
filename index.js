@@ -1,124 +1,64 @@
-/*global exports*/
+/*global exports,require*/
 
 "use strict";
 
-function Homework()
+const https = require("https");
+
+function request(evt, ctx, cb)
 {
+    var cbcalled = false, data;
+    try {
+        data = JSON.stringify(evt);
+    } catch (e) {
+        console.error("exception stringifying json", evt, e);
+        cb(e, null);
+        return;
+    }
+    var opts = {
+        hostname: "www.homework.software",
+        port: 443,
+        path: "/oauth/request",
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Content-Length": data.length
+        }
+    };
+    var req = https.request(opts, (res) => {
+        var ret = "";
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+            ret += chunk;
+        });
+        res.on('end', () => {
+            try {
+                var out = JSON.parse(ret);
+                if (!cbcalled) {
+                    cb(null, out);
+                    cbcalled = true;
+                }
+            } catch (e) {
+                console.error("exception parsing json", ret, e);
+                if (!cbcalled) {
+                    cb(e, null);
+                    cbcalled = true;
+                }
+            }
+        });
+    });
+
+    req.on("error", (e) => {
+        console.error("error posting request", e);
+        if (!cbcalled) {
+            cb(e, null);
+            cbcalled = true;
+        }
+    });
+
+    req.write(data);
+    req.end();
 }
 
-Homework.prototype = {
-    execute: function(event, context, callback) {
-        if (event.header.namespace in this.handlers) {
-            this.handlers[event.header.namespace].call(this, event, context, callback);
-        } else {
-            console.error("Unknown execute request", JSON.stringify(event));
-        }
-    },
-
-    handlers: {
-        "Alexa.ConnectedHome.Discovery": function(event, context, callback) {
-            const token = event.payload.accessToken;
-
-            const discovery = {
-                "DiscoverAppliancesRequest": (response) => {
-                    response.payload = {
-                        discoveredAppliances: [
-                            {
-                                actions: [
-                                    "incrementTargetTemperature",
-                                    "decrementTargetTemperature",
-                                    "setTargetTemperature"
-                                ],
-                                additionalApplianceDetails: {
-                                    extraDetail1: "optionalDetailForSkillAdapterToReferenceThisDevice",
-                                    extraDetail2: "There can be multiple entries",
-                                    extraDetail3: "but they should only be used for reference purposes.",
-                                    extraDetail4: "This is not a suitable place to maintain current device state"
-                                },
-                                applianceId: "uniqueThermostatDeviceId",
-                                friendlyDescription: "descriptionThatIsShownToCustomer",
-                                friendlyName: "Bedroom Thermostat",
-                                isReachable: true,
-                                manufacturerName: "yourManufacturerName",
-                                modelName: "fancyThermostat",
-                                version: "your software version number here."
-                            },
-                            {
-                                actions: [
-                                    "incrementPercentage",
-                                    "decrementPercentage",
-                                    "setPercentage",
-                                    "turnOn",
-                                    "turnOff"
-                                ],
-                                additionalApplianceDetails: {},
-                                applianceId: "uniqueLightDeviceId",
-                                friendlyDescription: "descriptionThatIsShownToCustomer",
-                                friendlyName: "Living Room",
-                                isReachable: true,
-                                manufacturerName: "yourManufacturerName",
-                                modelName: "fancyLight",
-                                version: "your software version number here."
-                            }
-                        ]
-                    };
-                }
-            };
-
-            var response = {
-                header: {
-                    namespace: "Alexa.ConnectedHome.Discovery",
-                    name: "DiscoverAppliancesResponse",
-                    payloadVersion: "2"
-                },
-                payload: ""
-            };
-
-            if (event.header.name in discovery) {
-                discovery[event.header.name](response);
-            } else {
-                console.error(event.header.name, "is not a valid discovery");
-            }
-
-            console.log("about to return", JSON.stringify(response));
-
-            callback(null, response);
-        },
-        "Alexa.ConnectedHome.Control": function(event, context, callback) {
-            const token = event.payload.accessToken;
-
-            const deviceId = event.payload.appliance.applianceId;
-            const messageId = event.header.messageId;
-
-            const control = {
-                "TurnOnRequest": (response) => {
-                    response.payload = { };
-                    console.log(`turning on device ${deviceId} with token ${token}`);
-                }
-            };
-
-            var response = {
-                header: {
-                    namespace: "Alexa.ConnectedHome.Control",
-                    name: "TurnOnConfirmation",
-                    payloadVersion: "2",
-                    messageId: messageId
-                },
-                payload: ""
-            };
-
-            if (event.header.name in control) {
-                control[event.header.name](response);
-            } else {
-                console.error(event.header.name, "is not a valid control");
-            }
-
-            callback(null, response);
-        }
-    }
-};
-
 exports.handler = function(event, context, callback) {
-    var homework = new Homework();
-    homework.execute(event, context, callback);
+    request(event, context, callback);
 };
